@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fake News Detector</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: rgba(255, 255, 255, 0.05);
+      --panel-border: rgba(255, 255, 255, 0.10);
+      --text: #e6edf7;
+      --muted: #8ea2bd;
+      --accent: #2e6fb0;
+      --accent-2: #4f9fe0;
+      --real: #22c55e;
+      --fake: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Roboto, system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 600px at 10% -10%, rgba(46,111,176,0.25), transparent),
+        radial-gradient(900px 600px at 110% 10%, rgba(79,159,224,0.18), transparent),
+        var(--bg);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 16px;
+    }
+    .card {
+      width: 100%;
+      max-width: 640px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      padding: 28px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+    h1 { margin: 0 0 4px; font-size: 24px; }
+    .sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      resize: vertical;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid var(--panel-border);
+      background: rgba(0, 0, 0, 0.25);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.5;
+      outline: none;
+    }
+    textarea:focus { border-color: var(--accent-2); }
+    .samples { display: flex; gap: 8px; margin: 12px 0 4px; flex-wrap: wrap; }
+    .samples button {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--panel-border);
+      color: var(--muted);
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .samples button:hover { color: var(--text); border-color: var(--accent-2); }
+    .analyze {
+      width: 100%;
+      margin-top: 16px;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .analyze:disabled { opacity: 0.6; cursor: not-allowed; }
+    .result { margin-top: 24px; display: none; }
+    .result.show { display: block; animation: fade 0.3s ease; }
+    @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .verdict {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 18px;
+      border-radius: 14px;
+      border: 1px solid var(--panel-border);
+      background: rgba(0, 0, 0, 0.25);
+    }
+    .verdict .label { font-size: 30px; font-weight: 800; letter-spacing: 0.5px; }
+    .verdict .conf { color: var(--muted); font-size: 14px; }
+    .label.REAL { color: var(--real); }
+    .label.FAKE { color: var(--fake); }
+    .bars { margin-top: 16px; }
+    .bar-row { margin-bottom: 12px; }
+    .bar-top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: var(--muted); }
+    .bar-track { height: 10px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; }
+    .bar-fill.REAL { background: var(--real); }
+    .bar-fill.FAKE { background: var(--fake); }
+    .error { color: var(--fake); font-size: 14px; margin-top: 14px; display: none; }
+    .foot { margin-top: 22px; color: var(--muted); font-size: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Fake News Detector</h1>
+    <p class="sub">Paste a news headline or article. The model predicts REAL or FAKE with a confidence score.</p>
+
+    <label for="text">News text</label>
+    <textarea id="text" placeholder="Paste a headline or article here..."></textarea>
+
+    <div class="samples">
+      <button data-sample="real">Try a real-style example</button>
+      <button data-sample="fake">Try a fake-style example</button>
+      <button data-sample="clear">Clear</button>
+    </div>
+
+    <button class="analyze" id="analyze">Analyze</button>
+
+    <div class="error" id="error"></div>
+
+    <div class="result" id="result">
+      <div class="verdict">
+        <span class="label" id="verdictLabel"></span>
+        <span class="conf" id="verdictConf"></span>
+      </div>
+      <div class="bars">
+        <div class="bar-row">
+          <div class="bar-top"><span>REAL</span><span id="realPct">0%</span></div>
+          <div class="bar-track"><div class="bar-fill REAL" id="realBar" style="width:0%"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-top"><span>FAKE</span><span id="fakePct">0%</span></div>
+          <div class="bar-track"><div class="bar-fill FAKE" id="fakeBar" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="foot">DistilBERT · runs fully on your machine</p>
+  </div>
+
+  <script>
+    const SAMPLES = {
+      real: "The government reported that inflation eased slightly last month as fuel prices fell, according to figures published by the statistics office.",
+      fake: "EXPOSED: scientists confirm the moon is secretly made of cheese and the space agency has been hiding the truth for decades, insiders reveal!!!"
+    };
+
+    const textEl = document.getElementById("text");
+    const analyzeBtn = document.getElementById("analyze");
+    const resultEl = document.getElementById("result");
+    const errorEl = document.getElementById("error");
+
+    document.querySelectorAll(".samples button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const kind = btn.dataset.sample;
+        if (kind === "clear") { textEl.value = ""; resultEl.classList.remove("show"); }
+        else { textEl.value = SAMPLES[kind]; }
+        textEl.focus();
+      });
+    });
+
+    async function analyze() {
+      const text = textEl.value.trim();
+      errorEl.style.display = "none";
+      resultEl.classList.remove("show");
+      if (!text) { showError("Please enter some text first."); return; }
+
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = "Analyzing...";
+      try {
+        const res = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || ("Server error (" + res.status + ")"));
+        }
+        const data = await res.json();
+        render(data);
+      } catch (e) {
+        showError(e.message || "Something went wrong.");
+      } finally {
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = "Analyze";
+      }
+    }
+
+    function render(data) {
+      const label = data.label;
+      const conf = Math.round(data.confidence * 100);
+      const real = Math.round((data.probabilities.REAL ?? 0) * 100);
+      const fake = Math.round((data.probabilities.FAKE ?? 0) * 100);
+
+      const labelEl = document.getElementById("verdictLabel");
+      labelEl.textContent = label;
+      labelEl.className = "label " + label;
+      document.getElementById("verdictConf").textContent = conf + "% confident";
+
+      document.getElementById("realPct").textContent = real + "%";
+      document.getElementById("fakePct").textContent = fake + "%";
+      document.getElementById("realBar").style.width = real + "%";
+      document.getElementById("fakeBar").style.width = fake + "%";
+
+      resultEl.classList.add("show");
+    }
+
+    function showError(msg) { errorEl.textContent = msg; errorEl.style.display = "block"; }
+
+    analyzeBtn.addEventListener("click", analyze);
+    textEl.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") analyze();
+    });
+  </script>
+</body>
+</html>

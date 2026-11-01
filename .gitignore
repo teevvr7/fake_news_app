@@ -1,0 +1,36 @@
+# Trained model (large files) - keep out of git
+fake_news_model/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.zip
+*.tar.gz
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE & Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files & logs
+.DS_Store
+Thumbs.db
+*.log
